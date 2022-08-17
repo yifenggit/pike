@@ -1,0 +1,28 @@
+syntax = "proto3";
+/*
+    生成到当前路径 
+    protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative test.proto
+ */
+/*
+    生成到$(go env GOPATH)/src/$(go_package) 
+    protoc --go_out=$(go env GOPATH)/src test.proto
+    protoc --gofast_out=$(go env GOPATH)/src test.proto
+    protoc -I $(go env GOPATH)/src/github.com/yifenggit/pike/examples/jobs/protos --gofast_out=$(go env GOPATH)/src student.proto
+    github.com/gogo/protobuf
+*/ 
+option go_package = "github.com/yifenggit/pike/examples/jobs/protos/pb";
+
+package pb;
+import "base.proto";
+
+message Student {
+    string Name = 1;
+    int32 Age = 2;
+    pb.Card Cart = 3;
+    repeated Book Books = 4;
+}
+
+message Book {
+    int64 Id = 1;
+    string Name = 2;
+}

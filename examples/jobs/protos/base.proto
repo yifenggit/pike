@@ -1,0 +1,21 @@
+syntax = "proto3";
+/*
+    生成到当前路径 
+    protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative test.proto
+ */
+/*
+    生成到$(go env GOPATH)/src/$(go_package) 
+    protoc --go_out=$(go env GOPATH)/src test.proto
+    protoc --gofast_out=$(go env GOPATH)/src test.proto
+    protoc -I $(go env GOPATH)/src/github.com/yifenggit/pike/examples/jobs/protos --gofast_out=$(go env GOPATH)/src base.proto
+*/ 
+option go_package = "github.com/yifenggit/pike/examples/jobs/protos/pb";
+
+package pb;
+
+import public "google/protobuf/any.proto";
+
+message Card {
+    int32 Number = 1;
+    string Type = 2;
+}

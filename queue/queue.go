@@ -6,7 +6,6 @@ import (
 	"log"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 )
@@ -14,7 +13,7 @@ import (
 type Queueable[T any] interface {
 	Perform(p T)
 	Async(p T)
-	NewClient() (client pulsar.Client)
+	NewClient(p pulsar.ClientOptions) (client pulsar.Client)
 	CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage)
 	SetMessage(p pulsar.Message)
 	Ack()
@@ -31,7 +30,7 @@ type QueueBase[T any] struct {
 	onceProducer   sync.Once
 	onceClient     sync.Once
 	onceConsumer   sync.Once
-	autoAck *bool
+	autoAck        *bool
 }
 
 var queues map[string]Queueable[any]
@@ -50,19 +49,25 @@ func (m *QueueBase[T]) SetMessage(message pulsar.Message) {
 	m.Message = message
 }
 
-func (m *QueueBase[T]) NewClient() (client pulsar.Client) {
+func (m *QueueBase[T]) NewClient(options pulsar.ClientOptions) (client pulsar.Client) {
 	m.onceClient.Do(func() {
-		client, err := pulsar.NewClient(pulsar.ClientOptions{
-			URL:               "pulsar://localhost:6650",
-			OperationTimeout:  30 * time.Second,
-			ConnectionTimeout: 30 * time.Second,
-		})
+		client, err := pulsar.NewClient(options)
 		if err != nil {
 			log.Fatalf("Could not instantiate Pulsar client: %v", err)
 		} else {
 			m.Client = client
 		}
 	})
+	if m.Client != nil {
+
+	}
+	return m.Client
+}
+
+func (m *QueueBase[T]) setClient() (client pulsar.Client) {
+	if m.Client == nil {
+		m.Client = pulsarClient
+	}
 	return m.Client
 }
 
@@ -87,7 +92,7 @@ func (m *QueueBase[T]) createProducer() pulsar.Producer {
 }
 
 func (m *QueueBase[T]) Async(p T) {
-	m.NewClient()
+	m.setClient()
 	m.createProducer()
 	_, err := m.Producer.Send(context.Background(), &pulsar.ProducerMessage{
 		Value: &p,
@@ -98,6 +103,7 @@ func (m *QueueBase[T]) Async(p T) {
 }
 
 func (m *QueueBase[T]) CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage) {
+	m.setClient()
 	m.onceConsumer.Do(func() {
 		m.MessageChannel = make(chan pulsar.ConsumerMessage, 100)
 		consumer, err := m.Client.Subscribe(pulsar.ConsumerOptions{
@@ -137,7 +143,6 @@ func Subscribe[T any](p Queueable[T]) {
 		vmethod := reflect.ValueOf(&m).Elem().MethodByName("Perform")
 		if vmethod.IsValid() {
 			subv := new(T)
-			m.NewClient()
 			consumer, channel := m.CreateConsumer()
 			for cm := range channel {
 				msg := cm.Message

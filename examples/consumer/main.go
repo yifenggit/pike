@@ -17,5 +17,7 @@ func main() {
 	})
 	queue.Subscribe[pb.Student](jobs.NewStudent())
 	queue.Subscribe[pb.Teacher](jobs.NewTeacher())
+	queue.Subscribe[int32](jobs.NewCalc())
+	queue.Subscribe[string](jobs.NewHello())
 	queue.Wait()
 }

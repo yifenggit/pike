@@ -10,13 +10,17 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 )
 
+type Callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)
 type Queueable[T any] interface {
 	Perform(p T)
-	Async(p T)
+	Send(p T) pulsar.MessageID
+	SendAsync(p T, callback Callback)
 	NewClient(p pulsar.ClientOptions) (client pulsar.Client)
 	CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage)
-	SetMessage(p pulsar.Message)
+	SetMessage(message pulsar.Message)
+	ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error)
 	Ack()
+	AckID(messageID pulsar.MessageID)
 	AckSchema() bool
 }
 
@@ -26,6 +30,7 @@ type QueueBase[T any] struct {
 	pulsar.Producer
 	pulsar.Consumer
 	pulsar.Message
+	*pulsar.ProducerMessage
 	MessageChannel chan pulsar.ConsumerMessage
 	onceProducer   sync.Once
 	onceClient     sync.Once
@@ -47,6 +52,34 @@ func (m *QueueBase[T]) SetTopic(topic string) {
 
 func (m *QueueBase[T]) SetMessage(message pulsar.Message) {
 	m.Message = message
+}
+
+func (m *QueueBase[T]) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error) {
+	m.setClient()
+	reader, err := m.Client.CreateReader(pulsar.ReaderOptions{
+		Topic:                   m.Topic,
+		StartMessageID:          messageID,
+		StartMessageIDInclusive: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	message, err := reader.Next(context.Background())
+	if err != nil {
+		return nil, err
+	} else {
+		return message, nil
+	}
+}
+
+func (m *QueueBase[T]) Ack() {
+	consumer, _ := m.CreateConsumer()
+	consumer.Ack(m.Message)
+}
+
+func (m *QueueBase[T]) AckID(messageID pulsar.MessageID) {
+	consumer, _ := m.CreateConsumer()
+	consumer.AckID(messageID)
 }
 
 func (m *QueueBase[T]) NewClient(options pulsar.ClientOptions) (client pulsar.Client) {
@@ -113,21 +146,40 @@ func (m *QueueBase[T]) createProducer() pulsar.Producer {
 	return m.Producer
 }
 
-func (m *QueueBase[T]) Async(p T) {
+func initProducer[T any](m *QueueBase[T], p T) {
 	m.setClient()
 	m.createProducer()
+	if m.ProducerMessage == nil {
+		m.ProducerMessage = new(pulsar.ProducerMessage)
+	}
 	var value any
 	if v := reflect.ValueOf(p).Kind(); v == reflect.Struct {
 		value = &p
 	} else {
 		value = p
 	}
-	_, err := m.Producer.Send(context.Background(), &pulsar.ProducerMessage{
-		Value: value,
-	})
+	m.ProducerMessage.Value = value
+}
+
+func (m *QueueBase[T]) Set(pm *pulsar.ProducerMessage) *QueueBase[T] {
+	m.ProducerMessage = pm
+	return m
+}
+
+func (m *QueueBase[T]) Send(p T) pulsar.MessageID {
+	initProducer(m, p)
+	messageID, err := m.Producer.Send(context.Background(), m.ProducerMessage)
 	if err != nil {
 		log.Fatal(err)
 	}
+	return messageID
+}
+
+func (m *QueueBase[T]) SendAsync(p T, callback Callback) {
+	initProducer(m, p)
+	m.Producer.SendAsync(context.Background(), &pulsar.ProducerMessage{
+		Value: m.ProducerMessage,
+	}, callback)
 }
 
 func (m *QueueBase[T]) CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage) {
@@ -162,13 +214,9 @@ func (m *QueueBase[T]) AckSchema() bool {
 	return *m.autoAck
 }
 
-func (m *QueueBase[T]) Ack() {
-	m.Consumer.Ack(m.Message)
-}
-
 func Subscribe[T any](p Queueable[T]) {
 	go func(m Queueable[T]) {
-		defer func ()  {
+		defer func() {
 			if r := recover(); r != nil {
 				fmt.Println("Recovered in f", r)
 			}

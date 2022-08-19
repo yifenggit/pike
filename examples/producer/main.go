@@ -16,9 +16,9 @@ func main() {
 		ConnectionTimeout: 30 * time.Second,
 	})
 	for i := 1; i <= 100; i++ {
-		jobs.NewStudent().Async(pb.Student{Name: "xiaoming", Age: int32(i)})
-		jobs.NewTeacher().Async(pb.Teacher{Name: "xiaowang", Age: int32(i)})
-		jobs.NewCalc().Async(int32(i))
-		jobs.NewHello().Async("Hello World!")
+		jobs.NewStudent().Send(pb.Student{Name: "xiaoming", Age: int32(i)})
+		jobs.NewTeacher().Send(pb.Teacher{Name: "xiaowang", Age: int32(i)})
+		jobs.NewCalc().Send(int32(i))
+		jobs.NewHello().Send("Hello World!")
 	}
 }

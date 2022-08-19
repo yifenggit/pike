@@ -20,4 +20,7 @@ func main() {
 	queue.Subscribe[int32](jobs.NewCalc())
 	queue.Subscribe[string](jobs.NewHello())
 	queue.Wait()
+
+	// TODO 1.支持设置延迟执行  2.DeleteMessage 3.ReadMessage 4.解决递归调用
+
 }

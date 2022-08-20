@@ -2,9 +2,11 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
+	"regexp"
 	"sync"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -13,7 +15,7 @@ import (
 type Callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)
 type Queueable[T any] interface {
 	Perform(p T)
-	Send(p T) pulsar.MessageID
+	Send(p T) (pulsar.MessageID, error)
 	SendAsync(p T, callback Callback)
 	NewClient(p pulsar.ClientOptions) (client pulsar.Client)
 	CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage)
@@ -38,12 +40,62 @@ type QueueBase[T any] struct {
 	autoAck        *bool
 }
 
-var queues map[string]Queueable[any]
+var registers map[string]any
+var registersOnce sync.Once
 
-func Register[T any](q Queueable[T]) Queueable[T] {
-	k := reflect.TypeOf(q).String()
-	queues[k] = nil
-	return q
+func Register(data ...any) {
+	registersOnce.Do(func() {
+		registers = make(map[string]any)
+	})
+	for _, p := range data {
+		key := reflect.ValueOf(p).Elem().Type().Name()
+		re := regexp.MustCompile(`\[.*\]$`)
+		key = re.ReplaceAllString(key, "")
+		registers[key] = p
+	}
+}
+
+type call struct {
+	Q any
+}
+
+func Call(key string) *call {
+	v, ok := registers[key]
+	if ok {
+		return &call{Q: v}
+	} else {
+		fmt.Printf("Not initialized %s struct\n", key)
+	}
+	return nil
+}
+
+func (m *call) Send(p any) (pulsar.MessageID, error) {
+	vmethod := reflect.ValueOf(m.Q).MethodByName("Send")
+	if vmethod.IsValid() {
+		var returns []reflect.Value
+		if vmethod.Type().NumIn() > 0 {
+			returns = vmethod.Call([]reflect.Value{reflect.ValueOf(p)})
+		} else {
+			returns = vmethod.Call([]reflect.Value{})
+		}
+		for _, v := range returns {
+			fmt.Printf("%v\n", v)
+		}
+		messageID, _ := returns[0].Interface().(pulsar.MessageID)
+		err, _ := returns[1].Interface().(error)
+		return messageID, err
+	}
+	return nil, errors.New("Not found method Send")
+}
+func (m *call) SendAsync(p any, callback Callback) {
+	vmethod := reflect.ValueOf(m.Q).MethodByName("SendAsync")
+	if vmethod.IsValid() {
+		if vmethod.Type().NumIn() > 0 {
+			vmethod.Call([]reflect.Value{reflect.ValueOf(p), reflect.ValueOf(callback)})
+		} else {
+			vmethod.Call([]reflect.Value{})
+		}
+	}
 }
 
 func (m *QueueBase[T]) SetTopic(topic string) {
@@ -86,7 +138,7 @@ func (m *QueueBase[T]) NewClient(options pulsar.ClientOptions) (client pulsar.Cl
 	m.onceClient.Do(func() {
 		client, err := pulsar.NewClient(options)
 		if err != nil {
-			log.Fatalf("Could not instantiate Pulsar client: %v", err)
+			log.Fatalf("Could not instantiate pulsar client: %v", err)
 		} else {
 			m.Client = client
 		}
@@ -166,20 +218,19 @@ func (m *QueueBase[T]) Set(pm *pulsar.ProducerMessage) *QueueBase[T] {
 	return m
 }
 
-func (m *QueueBase[T]) Send(p T) pulsar.MessageID {
+func (m *QueueBase[T]) Send(p T) (pulsar.MessageID, error) {
 	initProducer(m, p)
 	messageID, err := m.Producer.Send(context.Background(), m.ProducerMessage)
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
-	return messageID
+	return messageID, nil
 }
 
-func (m *QueueBase[T]) SendAsync(p T, callback Callback) {
+func (m *QueueBase[T]) SendAsync(p T, cb Callback) {
 	initProducer(m, p)
-	m.Producer.SendAsync(context.Background(), &pulsar.ProducerMessage{
-		Value: m.ProducerMessage,
-	}, callback)
+	m.Producer.SendAsync(context.Background(), m.ProducerMessage, cb)
 }
 
 func (m *QueueBase[T]) CreateConsumer() (pulsar.Consumer, chan pulsar.ConsumerMessage) {

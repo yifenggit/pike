@@ -18,7 +18,7 @@ var teacherOnce sync.Once
 func NewTeacher() *Teacher[pb.Teacher] {
 	teacherOnce.Do(func() {
 		teacher = new(Teacher[pb.Teacher])
-		teacher.SetTopic("teacher")
+		teacher.SetTopic(queue.StructNameShort(teacher))
 	})
 	return teacher
 }

@@ -43,12 +43,19 @@ type QueueBase[T any] struct {
 var registers map[string]any
 var registersOnce sync.Once
 
+func StructNameShort(p any) string {
+	key := reflect.ValueOf(p).Elem().Type().Name()
+	re := regexp.MustCompile(`\[.*\]$`)
+	key = re.ReplaceAllString(key, "")
+	return key
+}
+
 func Register(data ...any) {
 	registersOnce.Do(func() {
 		registers = make(map[string]any)
 	})
 	for _, p := range data {
-		key := reflect.ValueOf(p).Elem().Type().Name()
+		key := StructNameShort(p)
 		re := regexp.MustCompile(`\[.*\]$`)
 		key = re.ReplaceAllString(key, "")
 		registers[key] = p

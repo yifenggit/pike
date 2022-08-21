@@ -17,7 +17,7 @@ var helloOnce sync.Once
 func NewHello() *Hello[string] {
 	helloOnce.Do(func() {
 		hello = new(Hello[string])
-		hello.SetTopic("hello")
+		hello.SetTopic(queue.StructNameShort(hello))
 	})
 	return hello
 }

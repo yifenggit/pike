@@ -17,7 +17,7 @@ var calcOnce sync.Once
 func NewCalc() *Calc[int32] {
 	calcOnce.Do(func() {
 		calc = new(Calc[int32])
-		calc.SetTopic("calc")
+		calc.SetTopic(queue.StructNameShort(calc))
 	})
 	return calc
 }

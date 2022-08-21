@@ -196,6 +196,7 @@ func (m *QueueBase[T]) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, 
 		Topic:                   m.Topic,
 		StartMessageID:          messageID,
 		StartMessageIDInclusive: true,
+		ReceiverQueueSize:       1,
 	})
 	if err != nil {
 		return nil, err

@@ -44,9 +44,6 @@ func Call(key string) *call {
 
 func (m *call) ResetSet() *call {
 	vmethod := reflect.ValueOf(m.Q).MethodByName("ResetSet")
-	println("*********************ResetSet****************************")
-	println(vmethod.IsValid(), vmethod.Type().NumIn())
-	println("*********************ResetSet****************************")
 	if vmethod.IsValid() {
 		vmethod.Call([]reflect.Value{})
 	}
@@ -86,6 +83,28 @@ func (m *call) SendAsync(p any, callback Callback) {
 			vmethod.Call([]reflect.Value{reflect.ValueOf(p), reflect.ValueOf(callback)})
 		} else {
 			vmethod.Call([]reflect.Value{})
+		}
+	}
+}
+
+func (m *call) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error) {
+	vmethod := reflect.ValueOf(m.Q).MethodByName("ReadMessage")
+	if vmethod.IsValid() {
+		if vmethod.Type().NumIn() > 0 {
+			returns := vmethod.Call([]reflect.Value{reflect.ValueOf(messageID)})
+			message, _ := returns[0].Interface().(pulsar.Message)
+			err, _ := returns[1].Interface().(error)
+			return message, err
+		}
+	}
+	return nil, errors.New("Not found method ReadMessage")
+}
+
+func (m *call) AckID(messageID pulsar.MessageID) {
+	vmethod := reflect.ValueOf(m.Q).MethodByName("AckID")
+	if vmethod.IsValid() {
+		if vmethod.Type().NumIn() > 0 {
+			vmethod.Call([]reflect.Value{reflect.ValueOf(messageID)})
 		}
 	}
 }

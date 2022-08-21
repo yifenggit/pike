@@ -10,6 +10,7 @@ import (
 var pulsarClient pulsar.Client
 var pulsarClientOnce sync.Once
 
+// global Client
 func NewClient(options pulsar.ClientOptions) pulsar.Client {
 	pulsarClientOnce.Do(func() {
 		client, err := pulsar.NewClient(options)

@@ -141,8 +141,13 @@ func initProducer[T any](m *QueueBase[T], p T) {
 	m.ProducerMessage.Value = value
 }
 
-func (m *QueueBase[T]) Set(pm *pulsar.ProducerMessage) *QueueBase[T] {
-	m.ProducerMessage = pm
+func (m *QueueBase[T]) Set(pm pulsar.ProducerMessage) *QueueBase[T] {
+	m.ProducerMessage = &pm
+	return m
+}
+
+func (m *QueueBase[T]) ResetSet() *QueueBase[T] {
+	m.ProducerMessage = nil
 	return m
 }
 

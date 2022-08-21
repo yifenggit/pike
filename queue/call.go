@@ -32,13 +32,28 @@ func Register(data ...any) {
 func Call(key string) *call {
 	v, ok := registers[key]
 	if ok {
-		return &call{Q: v}
+		c := new(call)
+		c.Q = v
+		c.ResetSet()
+		return c
 	} else {
 		fmt.Printf("Not initialized %s struct\n", key)
 	}
 	return nil
 }
-func (m *call) Set(pm *pulsar.ProducerMessage) *call {
+
+func (m *call) ResetSet() *call {
+	vmethod := reflect.ValueOf(m.Q).MethodByName("ResetSet")
+	println("*********************ResetSet****************************")
+	println(vmethod.IsValid(), vmethod.Type().NumIn())
+	println("*********************ResetSet****************************")
+	if vmethod.IsValid() {
+		vmethod.Call([]reflect.Value{})
+	}
+	return m
+}
+
+func (m *call) Set(pm pulsar.ProducerMessage) *call {
 	vmethod := reflect.ValueOf(m.Q).MethodByName("Set")
 	if vmethod.IsValid() {
 		if vmethod.Type().NumIn() > 0 {

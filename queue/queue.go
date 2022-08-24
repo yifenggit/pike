@@ -155,7 +155,6 @@ func (m *QueueBase[T]) Send(p T) (pulsar.MessageID, error) {
 	initProducer(m, p)
 	messageID, err := m.Producer.Send(context.Background(), m.ProducerMessage)
 	if err != nil {
-		log.Fatal(err)
 		return nil, err
 	}
 	return messageID, nil

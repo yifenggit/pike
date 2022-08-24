@@ -18,6 +18,9 @@ func main() {
 	})
 	queue.Register(jobs.NewStudent(), jobs.NewTeacher(), jobs.NewCalc(), jobs.NewHello())
 	messageID, _ := queue.Call("Hello").Set(pulsar.ProducerMessage{DeliverAfter: 5 * time.Second}).Send("Hello World Wait 5s!")
+
+	queue.Call("Hello").Set(pulsar.ProducerMessage{DeliverAfter: 2 * time.Second}).Send("Hello World Wait 2s!")
+
 	message, _ := queue.Call("Hello").ReadMessage(messageID)
 	messageID2, _ := pulsar.DeserializeMessageID(message.ID().Serialize())
 
@@ -32,7 +35,7 @@ func main() {
 	println("*********************main ReadMessage****************************")
 	fmt.Printf("%v %v %v %v %v %v %v %v\n", messageID, messageID2, messageID == messageID2, pulsarID, pulsarID2, pulsarID == pulsarID2, msgID, msgID2)
 	println("*********************main ReadMessage****************************")
-	queue.Call("Hello").AckID(msgID2)
+	queue.Call("Hello").AckID(messageID)
 	// for i := 1; i <= 1; i++ {
 	// 	jobs.NewStudent().Send(pb.Student{Name: "Jennie", Age: 20})
 	// 	queue.Call("Teacher").Send(pb.Teacher{Name: "Tom", Age: 25})

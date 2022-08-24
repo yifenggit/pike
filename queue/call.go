@@ -10,7 +10,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 )
 
-type call struct {
+type CallQueue struct {
 	Q any
 }
 
@@ -29,45 +29,46 @@ func Register(data ...any) {
 	}
 }
 
-func Call(key string) *call {
+func Call(key string) *CallQueue {
 	v, ok := registers[key]
 	if ok {
-		c := new(call)
-		c.Q = v
-		c.ResetSet()
-		return c
+		c := &CallQueue{Q: v}
+		return c.ResetSet()
 	} else {
 		fmt.Printf("Not initialized %s struct\n", key)
 	}
 	return nil
 }
 
-func (m *call) ResetSet() *call {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("ResetSet")
-	if vmethod.IsValid() {
-		vmethod.Call([]reflect.Value{})
+func CallMethod(q any, methodName string) (vm reflect.Value, ok bool) {
+	vm = reflect.ValueOf(q).MethodByName(methodName)
+	ok = vm.IsValid()
+	return
+}
+
+func (m *CallQueue) ResetSet() *CallQueue {
+	if vm, ok := CallMethod(m.Q, "ResetSet"); ok {
+		vm.Call([]reflect.Value{})
 	}
 	return m
 }
 
-func (m *call) Set(pm pulsar.ProducerMessage) *call {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("Set")
-	if vmethod.IsValid() {
-		if vmethod.Type().NumIn() > 0 {
-			vmethod.Call([]reflect.Value{reflect.ValueOf(pm)})
+func (m *CallQueue) Set(pm pulsar.ProducerMessage) *CallQueue {
+	if vm, ok := CallMethod(m.Q, "Set"); ok {
+		if vm.Type().NumIn() > 0 {
+			vm.Call([]reflect.Value{reflect.ValueOf(pm)})
 		}
 	}
 	return m
 }
 
-func (m *call) Send(p any) (pulsar.MessageID, error) {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("Send")
-	if vmethod.IsValid() {
+func (m *CallQueue) Send(p any) (pulsar.MessageID, error) {
+	if vm, ok := CallMethod(m.Q, "Send"); ok {
 		var returns []reflect.Value
-		if vmethod.Type().NumIn() > 0 {
-			returns = vmethod.Call([]reflect.Value{reflect.ValueOf(p)})
+		if vm.Type().NumIn() > 0 {
+			returns = vm.Call([]reflect.Value{reflect.ValueOf(p)})
 		} else {
-			returns = vmethod.Call([]reflect.Value{})
+			returns = vm.Call([]reflect.Value{})
 		}
 		messageID, _ := returns[0].Interface().(pulsar.MessageID)
 		err, _ := returns[1].Interface().(error)
@@ -76,22 +77,20 @@ func (m *call) Send(p any) (pulsar.MessageID, error) {
 	return nil, errors.New("Not found method Send")
 }
 
-func (m *call) SendAsync(p any, callback Callback) {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("SendAsync")
-	if vmethod.IsValid() {
-		if vmethod.Type().NumIn() > 0 {
-			vmethod.Call([]reflect.Value{reflect.ValueOf(p), reflect.ValueOf(callback)})
+func (m *CallQueue) SendAsync(p any, callback Callback) {
+	if vm, ok := CallMethod(m.Q, "SendAsync"); ok {
+		if vm.Type().NumIn() > 0 {
+			vm.Call([]reflect.Value{reflect.ValueOf(p), reflect.ValueOf(callback)})
 		} else {
-			vmethod.Call([]reflect.Value{})
+			vm.Call([]reflect.Value{})
 		}
 	}
 }
 
-func (m *call) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error) {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("ReadMessage")
-	if vmethod.IsValid() {
-		if vmethod.Type().NumIn() > 0 {
-			returns := vmethod.Call([]reflect.Value{reflect.ValueOf(messageID)})
+func (m *CallQueue) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error) {
+	if vm, ok := CallMethod(m.Q, "ReadMessage"); ok {
+		if vm.Type().NumIn() > 0 {
+			returns := vm.Call([]reflect.Value{reflect.ValueOf(messageID)})
 			message, _ := returns[0].Interface().(pulsar.Message)
 			err, _ := returns[1].Interface().(error)
 			return message, err
@@ -100,11 +99,10 @@ func (m *call) ReadMessage(messageID pulsar.MessageID) (pulsar.Message, error) {
 	return nil, errors.New("Not found method ReadMessage")
 }
 
-func (m *call) AckID(messageID pulsar.MessageID) {
-	vmethod := reflect.ValueOf(m.Q).MethodByName("AckID")
-	if vmethod.IsValid() {
-		if vmethod.Type().NumIn() > 0 {
-			vmethod.Call([]reflect.Value{reflect.ValueOf(messageID)})
+func (m *CallQueue) AckID(messageID pulsar.MessageID) {
+	if vm, ok := CallMethod(m.Q, "AckID"); ok {
+		if vm.Type().NumIn() > 0 {
+			vm.Call([]reflect.Value{reflect.ValueOf(messageID)})
 		}
 	}
 }
